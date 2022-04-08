@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Near Test</title>
+<link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+</head>
+<body>
+<div id="app">
+  <v-app>
+    <v-main>
+      
+      <h1 style="text-align: center; margin: 20px; color: blue;">${profile.account}</h1>
+      <h3 style="text-align: center; margin: 20px; color: brown;">${profile.balance.available/(10**24)} NEAR</h3>
+      <h3 style="text-align: center; margin: 20px; color: darkorange;">${profile.details}</h3>
+      <div style="text-align:center; margin: 20px;">
+        <v-btn style="width: 30%; height: 48px; margin: auto; background-color: green; color: white;" @click="Login()">Login</v-btn>
+        <v-btn style="width: 30%; height: 48px; margin: auto; background-color: red; color: white;" @click="Logout()">Logout</v-btn>
+      </div>
+    </v-main>
+  </v-app>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+<script src="https://js.pusher.com/7.0/pusher.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/near-api-js@0.41.0/dist/near-api-js.min.js"></script>
+<script>
+    // import * as nearAPI from "near-api-js";
+    new Vue({
+      el: '#app',
+      delimiters: ['${','}'],
+      vuetify: new Vuetify(),
+      data: {
+        near:"",
+        wallet:"",
+        profile:{
+                  "account":"",
+                  "balance":"",
+                  "details":"",
+                },
+      },
+      async mounted() {
+        const { connect, keyStores, WalletConnection } =  window.nearApi;
+
+        const config = {
+          networkId: "testnet",
+          keyStore: new keyStores.BrowserLocalStorageKeyStore(),
+          nodeUrl: "https://rpc.testnet.near.org",
+          walletUrl: "https://wallet.testnet.near.org",
+          helperUrl: "https://helper.testnet.near.org",
+          explorerUrl: "https://explorer.testnet.near.org",
+        };
+
+        this.near = await connect(config);
+        this.wallet = new WalletConnection(this.near,"test-app");
+        console.log("SignIn",this.wallet.isSignedIn())
+        this.GetData()
+        
+        
+      },
+      methods: {
+        async Login(){
+          console.log("SignIn",this.wallet.isSignedIn())
+          if(this.wallet.isSignedIn()) {
+            this.GetData()
+          }
+          else{
+              this.wallet.requestSignIn(
+                "example-contract.testnet",
+                "Example App", // optional
+              ).then((res)=>{
+                console.log(res)
+              })
+          }
+        },
+        Logout(){
+          this.wallet.signOut();
+        },
+        async GetData(){
+          const walletAccountId = this.wallet.getAccountId();
+          const account = await this.near.account(walletAccountId);
+          const balance = await account.getAccountBalance();
+          const details = await account.getAccountDetails();
+
+          this.profile.account = walletAccountId
+          this.profile.balance = balance
+          this.profile.details = details
+
+          console.log(walletAccountId)
+          console.log(balance)
+          console.log(details)
+        }
+      }
+    })
+  </script>
+</body>
+</html>
