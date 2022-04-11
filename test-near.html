@@ -13,13 +13,32 @@
   <v-app>
     <v-main>
       
-      <h1 style="text-align: center; margin: 20px; color: blue;">${profile.account}</h1>
-      <h3 style="text-align: center; margin: 20px; color: brown;">${profile.balance.available/(10**24)} NEAR</h3>
-      <h3 style="text-align: center; margin: 20px; color: darkorange;">${profile.details}</h3>
+      <h1 style="text-align: center; margin: 20px; color: blue;">{{profile.account}}</h1>
+      <h3 style="text-align: center; margin: 20px; color: brown;">{{profile.balance}} NEAR</h3>
+      <!-- <h3 style="text-align: center; margin: 20px; color: darkorange;">{{profile.details}}</h3>
+      <h3 style="text-align: center; margin: 20px; color: darkgreen;">{{profile.accessKeys}}</h3> -->
       <div style="text-align:center; margin: 20px;">
         <v-btn style="width: 30%; height: 48px; margin: auto; background-color: green; color: white;" @click="Login()">Login</v-btn>
         <v-btn style="width: 30%; height: 48px; margin: auto; background-color: red; color: white;" @click="Logout()">Logout</v-btn>
+        <v-btn style="width: 30%; height: 48px; margin: auto; background-color: blue; color: white;" @click="SendNear()">Send Near</v-btn>
       </div>
+      <v-dialog
+        v-model="send.dialog"
+        persistent
+        max-width="600px"
+      >
+        <v-card>
+          <div style="text-align: center; padding: 20px;">
+            <h1>Send 1 NEAR</h1> 
+            <h2>From: {{send.from}} To: {{send.to}}</h2> 
+            <h4 style="color: brown;">Hash TX: {{send.tx.transaction.hash}}</h4> 
+            
+          </div>
+          <div style="text-align: center; padding: 20px;">
+            <v-btn style="background-color: green; color: aliceblue;" :disabled="send.btn" @click="send.dialog = false">{{send.txt_btn}}</v-btn>
+          </div>
+        </v-card>
+      </v-dialog>
     </v-main>
   </v-app>
 </div>
@@ -32,20 +51,31 @@
     // import * as nearAPI from "near-api-js";
     new Vue({
       el: '#app',
-      delimiters: ['${','}'],
+      delimiters: ['{{','}}'],
       vuetify: new Vuetify(),
       data: {
         near:"",
         wallet:"",
+        utils:"",
         profile:{
                   "account":"",
-                  "balance":"",
+                  "balance": 0,
                   "details":"",
+                  "accessKeys":"",
                 },
+        send : {
+                  "dialog":false,
+                  "btn":false,
+                  "txt_btn":"",
+                  "from":"",
+                  "to":"test.testnet",
+                  "value":"1000000000000000000000000",
+                  "tx":{"transaction":{"hash":"..."}},
+        }
       },
       async mounted() {
-        const { connect, keyStores, WalletConnection } =  window.nearApi;
-
+        const { connect, utils, keyStores, WalletConnection } =  window.nearApi;
+        this.utils = utils
         const config = {
           networkId: "testnet",
           keyStore: new keyStores.BrowserLocalStorageKeyStore(),
@@ -70,8 +100,8 @@
           }
           else{
               this.wallet.requestSignIn(
-                "example-contract.testnet",
-                "Example App", // optional
+                "aofserver.testnet", // Full access in only account
+                "Test App", // optional
               ).then((res)=>{
                 console.log(res)
               })
@@ -79,20 +109,51 @@
         },
         Logout(){
           this.wallet.signOut();
+          window.location.reload();
         },
         async GetData(){
           const walletAccountId = this.wallet.getAccountId();
           const account = await this.near.account(walletAccountId);
-          const balance = await account.getAccountBalance();
+          let balance = await account.getAccountBalance();
+          balance = this.utils.format.formatNearAmount(balance.available);
           const details = await account.getAccountDetails();
+          accessKeys = await account.getAccessKeys();
 
           this.profile.account = walletAccountId
           this.profile.balance = balance
           this.profile.details = details
+          this.profile.accessKeys = accessKeys
 
           console.log(walletAccountId)
           console.log(balance)
           console.log(details)
+        },
+        async SendNear(){
+          try {
+            const account = await this.near.account(this.profile.account);
+            this.send.dialog = true
+            this.send.from = this.profile.account
+            this.send.btn = true
+            this.send.txt_btn = "wait transaction"
+            this.send.tx = {"transaction":{"hash":"..."}} 
+            res = await account.sendMoney(
+              this.send.to,
+              this.send.value
+            );
+            this.send.tx = res
+            if(res.transaction.hash){
+              this.send.btn = false
+              this.send.txt_btn = "ok"
+            }
+            let balance = await account.getAccountBalance();
+            balance = this.utils.format.formatNearAmount(balance.available);
+            this.profile.balance = balance
+          } catch (error) {
+            this.send.tx = {"transaction":{"hash":"Error, Not allowed"}} 
+            this.send.btn = false
+            this.send.txt_btn = "Set permission and try again"
+          }
+          
         }
       }
     })
